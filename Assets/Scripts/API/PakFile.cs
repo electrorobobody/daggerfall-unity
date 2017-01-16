@@ -166,7 +166,7 @@ namespace DaggerfallConnect.Arena2
             if (x < 0 || x >= PakRowLength) return -1;
             if (y < 0 || y >= PakRowCount) return -1;
 
-            return Buffer[(y * PakRowLength) + x];
+            return Buffer[((y + 1) * PakRowLength) + (x + 1)];
         }
 
         #endregion

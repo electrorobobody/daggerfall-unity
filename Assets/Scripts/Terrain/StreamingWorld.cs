@@ -1314,9 +1314,6 @@ namespace DaggerfallWorkshop
             // Perform initial runtime setup
             if (Application.isPlaying)
             {
-                // Fix coastal climate data
-                TerrainHelper.DilateCoastalClimate(dfUnity.ContentReader, 2);
-
                 // Smooth steep location on steep gradients
                 TerrainHelper.SmoothLocationNeighbourhood(dfUnity.ContentReader);
             }

@@ -13,6 +13,7 @@
 using System;
 using System.IO;
 using DaggerfallConnect.Utility;
+using DaggerfallWorkshop;
 #endregion
 
 namespace DaggerfallConnect.Arena2
@@ -739,13 +740,18 @@ namespace DaggerfallConnect.Arena2
 
                 // Letters have some special cases
                 byte q = (byte)(blockCharacter / 16);
+
+                // Desert blocks are coded with "B" (examples: RESIBM04.RMB, TVRNBM01.RMB)
+                // Sometimes "B" blocks are used for non-Desert locations
+                // If climate does not match Desert, then Daggerfall replaces "B" blocks with "A" blocks (RESIAM04.RMB, TVRNAM01.RMB)
+                if ((dfLocation.Climate.ClimateType != DFLocation.ClimateBaseType.Desert) && (rmbBlockLetters[q].StartsWith("B")))
+                    q--;
+
                 if (dfLocation.Name == "Wayrest")
                 {
                     // Handle Wayrest exceptions
                     if (prefix == "CUST")
                         q = 0;
-                    else
-                        if (q > 0) q--;
                 }
                 else if (dfLocation.Name == "Sentinel")
                 {

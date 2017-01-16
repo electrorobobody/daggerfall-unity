@@ -218,6 +218,9 @@ namespace DaggerfallWorkshop.Utility
             if (woodsFileReader == null)
                 woodsFileReader = new WoodsFile(Path.Combine(arena2Path, WoodsFile.Filename), FileUsage.UseMemory, true);
 
+            // Fix coastal climate data
+            TerrainHelper.DilateCoastalClimate(this, 2);
+
             // Build map lookup dictionary
             if (mapDict == null && mapFileReader != null)
                 EnumerateMaps();
