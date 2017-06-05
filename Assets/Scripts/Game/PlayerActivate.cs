@@ -188,6 +188,15 @@ namespace DaggerfallWorkshop.Game
                             // Show NPC info
                             if (currentMode == PlayerActivateModes.Info)
                                 PresentNPCInfo(npc);
+
+                            // Show NPC window
+                            if ((currentMode == PlayerActivateModes.Talk) || (currentMode == PlayerActivateModes.Grab))
+                            {
+                                // TODO: Check if NPC is actionable (potentially, up to Quest Machine)
+                                DaggerfallUI.Instance.StaticNpcWindow.NpcFactionID = npc.Summary.FactionOrMobileID;
+                                DaggerfallUI.Instance.StaticNpcWindow.NpcFlags = npc.Summary.Flags;
+                                DaggerfallUI.PostMessage(DaggerfallUIMessages.dfuiStaticNpcWindow);
+                            }
                         }
                     }
                 }

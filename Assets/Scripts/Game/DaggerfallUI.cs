@@ -83,6 +83,7 @@ namespace DaggerfallWorkshop.Game
         DaggerfallAutomapWindow dfAutomapWindow;
         DaggerfallExteriorAutomapWindow dfExteriorAutomapWindow;
         DaggerfallBookReaderWindow dfBookReaderWindow;
+        DaggerfallStaticNpcWindow dfStaticNpcWindow;
         QuestMachineInspectorWindow dfQuestInspector;
 
         DaggerfallFontPlus fontPetrock32;
@@ -160,6 +161,11 @@ namespace DaggerfallWorkshop.Game
             get { return dfBookReaderWindow; }
         }
 
+        public DaggerfallStaticNpcWindow StaticNpcWindow
+        {
+            get { return dfStaticNpcWindow; }
+        }
+
         public DaggerfallAutomapWindow AutomapWindow
         {
             get { return dfAutomapWindow; }
@@ -196,6 +202,7 @@ namespace DaggerfallWorkshop.Game
             dfTravelMapWindow = new DaggerfallTravelMapWindow(uiManager);
             dfAutomapWindow = new DaggerfallAutomapWindow(uiManager);
             dfBookReaderWindow = new DaggerfallBookReaderWindow(uiManager);
+            dfStaticNpcWindow = new DaggerfallStaticNpcWindow(uiManager);
 
             dfExteriorAutomapWindow = new DaggerfallExteriorAutomapWindow(uiManager);
 
@@ -347,6 +354,9 @@ namespace DaggerfallWorkshop.Game
                     break;
                 case DaggerfallUIMessages.dfuiOpenBookReaderWindow:
                     uiManager.PushWindow(dfBookReaderWindow);
+                    break;
+                case DaggerfallUIMessages.dfuiStaticNpcWindow:
+                    uiManager.PushWindow(dfStaticNpcWindow);
                     break;
                 case DaggerfallUIMessages.dfuiExitGame:
 #if UNITY_EDITOR

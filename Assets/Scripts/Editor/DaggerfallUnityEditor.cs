@@ -317,6 +317,42 @@ namespace DaggerfallWorkshop
                         }
                     });
 
+                    var propInteriorIndex = Prop("BlockImporter_InteriorIndex");
+                    EditorGUILayout.LabelField(new GUIContent("Interior Index (Building index)", "Enter index of a building in .RMB."));
+                    GUILayoutHelper.Horizontal(() =>
+                    {
+                        propInteriorIndex.intValue = EditorGUILayout.IntField(propInteriorIndex.intValue);
+                        if (GUILayout.Button("Import Interior"))
+                        {
+                            // Create block
+                            if (propBlockName.stringValue.EndsWith(".RMB"))
+                            {
+                                //GameObjectHelper.CreateRMBBlockGameObject(propBlockName.stringValue, dfUnity.Option_RMBGroundPlane, dfUnity.Option_CityBlockPrefab);
+                                // Create base object
+                                //DFBlock blockData;
+                                //GameObject go = RMBLayout.CreateBaseGameObject(propBlockName.stringValue, out blockData, null);
+
+                                int doorBlockIndex = dfUnity.ContentReader.BlockFileReader.GetBlock(propBlockName.stringValue).Index;
+                                int doorRecordIndex = propInteriorIndex.intValue;
+                                GameObject newInterior = new GameObject(string.Format("DaggerfallInterior [Block={0}, Record={1}]", doorBlockIndex, doorRecordIndex));
+                                newInterior.hideFlags = HideFlags.None;
+                                DaggerfallInterior interior = newInterior.AddComponent<DaggerfallInterior>();
+                                //newInterior.transform.parent = go.transform;
+
+                                try
+                                {
+                                    interior.DoLayout(null, doorBlockIndex, doorRecordIndex, ClimateBases.Mountain);
+                                }
+                                catch
+                                {
+                                    //Destroy(newInterior);
+                                }
+
+                            }
+                        }
+                    });
+
+
                     EditorGUILayout.Space();
                     var propCityName = Prop("CityImporter_CityName");
                     EditorGUILayout.LabelField(new GUIContent("City Name", "Enter exact city name in format RegionName/CityName. Case-sensitive."));

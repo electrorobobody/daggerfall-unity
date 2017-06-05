@@ -33,7 +33,8 @@ namespace DaggerfallWorkshop
         ClimateBases climateBase = ClimateBases.Temperate;
         ClimateSeason climateSeason = ClimateSeason.Summer;
         List<GameObject> markers = new List<GameObject>();
-        StaticDoor entryDoor;
+        int entryDoorBlockIndex;
+        int entryDoorRecordIndex;
         Transform doorOwner;
 
         /// <summary>
@@ -46,7 +47,7 @@ namespace DaggerfallWorkshop
 
         public DFLocation.BuildingData BuildingData
         {
-            get { return blockData.RmbBlock.FldHeader.BuildingDataList[entryDoor.recordIndex]; }
+            get { return blockData.RmbBlock.FldHeader.BuildingDataList[entryDoorRecordIndex]; }
         }
 
         /// <summary>
@@ -55,14 +56,6 @@ namespace DaggerfallWorkshop
         public DaggerfallStaticDoors ExteriorDoors
         {
             get { return (doorOwner) ? doorOwner.GetComponent<DaggerfallStaticDoors>() : null; }
-        }
-
-        /// <summary>
-        /// Gets the door player clicked on to enter building.
-        /// </summary>
-        public StaticDoor EntryDoor
-        {
-            get { return entryDoor; }
         }
 
         void Start()
@@ -78,6 +71,11 @@ namespace DaggerfallWorkshop
         /// <returns>True if successful.</returns>
         public bool DoLayout(Transform doorOwner, StaticDoor door, ClimateBases climateBase)
         {
+            return DoLayout(doorOwner, door.blockIndex, door.recordIndex, climateBase);
+        }
+
+        public bool DoLayout(Transform doorOwner, int doorBlockIndex, int doorRecordIndex, ClimateBases climateBase)
+        {
             if (dfUnity == null)
                 dfUnity = DaggerfallUnity.Instance;
 
@@ -85,18 +83,19 @@ namespace DaggerfallWorkshop
             this.climateBase = climateBase;
 
             // Save exterior information
-            this.entryDoor = door;
+            this.entryDoorBlockIndex = doorBlockIndex;
+            this.entryDoorRecordIndex = doorRecordIndex;
             this.doorOwner = doorOwner;
 
             // Get block data
-            blockData = dfUnity.ContentReader.BlockFileReader.GetBlock(door.blockIndex);
+            blockData = dfUnity.ContentReader.BlockFileReader.GetBlock(doorBlockIndex);
             if (blockData.Type != DFBlock.BlockTypes.Rmb)
-                throw new Exception(string.Format("Could not load RMB block index {0}", door.blockIndex), null);
+                throw new Exception(string.Format("Could not load RMB block index {0}", doorBlockIndex), null);
 
             // Get record data
-            recordData = blockData.RmbBlock.SubRecords[door.recordIndex];
+            recordData = blockData.RmbBlock.SubRecords[doorRecordIndex];
             if (recordData.Interior.Header.Num3dObjectRecords == 0)
-                throw new Exception(string.Format("No interior 3D models found for record index {0}", door.recordIndex), null);
+                throw new Exception(string.Format("No interior 3D models found for record index {0}", doorRecordIndex), null);
 
             // Layout interior data
             AddModels();
@@ -122,7 +121,8 @@ namespace DaggerfallWorkshop
             this.climateBase = climateBase;
 
             // Save exterior information
-            this.entryDoor = door;
+            this.entryDoorBlockIndex = door.blockIndex;
+            this.entryDoorRecordIndex = door.recordIndex;
             this.doorOwner = doorOwner;
 
             // Get block data
@@ -219,7 +219,7 @@ namespace DaggerfallWorkshop
 
                 // Does this model have doors?
                 if (modelData.Doors != null)
-                    doors.AddRange(GameObjectHelper.GetStaticDoors(ref modelData, entryDoor.blockIndex, entryDoor.recordIndex, modelMatrix));
+                    doors.AddRange(GameObjectHelper.GetStaticDoors(ref modelData, entryDoorBlockIndex, entryDoorRecordIndex, modelMatrix));
 
                 // Get GameObject
                 if (MeshReplacement.ImportCustomGameobject(obj.ModelIdNum, modelMatrix.GetColumn(3), node.transform, GameObjectHelper.QuaternionFromMatrix(modelMatrix)) == null)

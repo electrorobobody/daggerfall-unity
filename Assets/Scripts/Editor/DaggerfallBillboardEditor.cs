@@ -141,6 +141,17 @@ namespace DaggerfallWorkshop
                         EditorGUILayout.LabelField("Current Frame", GUILayout.Width(EditorGUIUtility.labelWidth - 4));
                         EditorGUILayout.SelectableLabel(dfBillboard.Summary.CurrentFrame.ToString(), EditorStyles.textField, GUILayout.Height(EditorGUIUtility.singleLineHeight));
                     });
+                    GUILayoutHelper.Horizontal(() =>
+                    {
+                        EditorGUILayout.LabelField("FactionId", GUILayout.Width(EditorGUIUtility.labelWidth - 4));
+                        EditorGUILayout.SelectableLabel(dfBillboard.Summary.FactionOrMobileID.ToString("X4"), EditorStyles.textField, GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                    });
+                    GUILayoutHelper.Horizontal(() =>
+                    {
+                        EditorGUILayout.LabelField("Flags", GUILayout.Width(EditorGUIUtility.labelWidth - 4));
+                        EditorGUILayout.SelectableLabel(Convert.ToString(dfBillboard.Summary.Flags, 2), EditorStyles.textField, GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                    });
+
                 });
             });
         }

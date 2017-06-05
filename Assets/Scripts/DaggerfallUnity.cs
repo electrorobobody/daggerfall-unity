@@ -64,6 +64,7 @@ namespace DaggerfallWorkshop
         public string Arena2Path;
         public int ModelImporter_ModelID = 456;
         public string BlockImporter_BlockName = "MAGEAA01.RMB";
+        public int BlockImporter_InteriorIndex = 0;
         public string CityImporter_CityName = "Daggerfall/Daggerfall";
         public string Experimental_CityLayoutName = "Daggerfall/Aldcart";
         public string DungeonImporter_DungeonName = "Daggerfall/Privateer's Hold";
