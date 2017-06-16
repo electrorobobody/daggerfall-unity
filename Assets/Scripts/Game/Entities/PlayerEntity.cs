@@ -40,7 +40,13 @@ namespace DaggerfallWorkshop.Game.Entity
         protected int goldPieces = 0;
         protected PersistentFactionData factionData = new PersistentFactionData();
 
-        protected short[] skillUses = new short[34];
+        protected short[] skillUses;
+        protected uint timeOfLastSkillIncreaseCheck = 0;
+
+        protected int startingLevelUpSkillSum = 0;
+        protected int currentLevelUpSkillSum = 0;
+
+        protected bool readyToLevelUp = false;
 
         #endregion
 
@@ -54,6 +60,10 @@ namespace DaggerfallWorkshop.Game.Entity
         public ItemCollection OtherItems { get { return otherItems; } set { otherItems.ReplaceAll(value); } }
         public int GoldPieces { get { return goldPieces; } set { goldPieces = value; } }
         public PersistentFactionData FactionData { get { return factionData; } }
+        public short[] SkillUses { get { return skillUses; } set { skillUses = value; } }
+        public uint TimeOfLastSkillIncreaseCheck { get { return timeOfLastSkillIncreaseCheck; } set { timeOfLastSkillIncreaseCheck = value; } }
+        public int StartingLevelUpSkillSum { get { return startingLevelUpSkillSum; } set { startingLevelUpSkillSum = value; } }
+        public bool ReadyToLevelUp { get { return readyToLevelUp; } set { readyToLevelUp = value; } }
 
         #endregion
 
@@ -81,13 +91,18 @@ namespace DaggerfallWorkshop.Game.Entity
             otherItems.Clear();
             factionData.Reset();
             SetEntityDefaults();
+            startingLevelUpSkillSum = 0;
+            currentLevelUpSkillSum = 0;
             goldPieces = 0;
+            timeOfLastSkillIncreaseCheck = 0;
+            if (skillUses != null)
+                System.Array.Clear(skillUses, 0, skillUses.Length);
         }
 
         /// <summary>
         /// Assigns player entity settings from a character document.
         /// </summary>
-        public void AssignCharacter(CharacterDocument character, int level = 1, int maxHealth = 0)
+        public void AssignCharacter(CharacterDocument character, int level = 1, int maxHealth = 0, bool fillVitals = true)
         {
             if (character == null)
             {
@@ -104,13 +119,29 @@ namespace DaggerfallWorkshop.Game.Entity
             this.stats = character.workingStats;
             this.skills = character.workingSkills;
             this.reflexes = character.reflexes;
+            this.maxHealth = character.maxHealth;
+            this.currentHealth = character.currentHealth;
+            this.currentMagicka = character.currentSpellPoints;
+            this.currentFatigue = character.currentFatigue;
+            this.skillUses = character.skillUses;
+            this.startingLevelUpSkillSum = character.startingLevelUpSkillSum;
+
+            SetCurrentLevelUpSkillSum();
+
+            if (startingLevelUpSkillSum <= 0) // new character
+            {
+                startingLevelUpSkillSum = currentLevelUpSkillSum;
+            }
 
             if (maxHealth <= 0)
                 this.maxHealth = FormulaHelper.RollMaxHealth(level, stats.Endurance, career.HitPointsPerLevelOrMonsterLevel);
             else
                 this.maxHealth = maxHealth;
 
-            FillVitalSigns();
+            if (fillVitals)
+                FillVitalSigns();
+
+            timeOfLastSkillIncreaseCheck = DaggerfallUnity.Instance.WorldTime.Now.ToClassicDaggerfallTime();
 
             DaggerfallUnity.LogMessage("Assigned character " + this.name, true);
         }
@@ -190,6 +221,102 @@ namespace DaggerfallWorkshop.Game.Entity
             }
         }
 
+        /// <summary>
+        /// Raise skills if conditions are met.
+        /// </summary>
+        public void RaiseSkills()
+        {
+            DaggerfallDateTime now = DaggerfallUnity.Instance.WorldTime.Now;
+            if ((now.ToClassicDaggerfallTime() - timeOfLastSkillIncreaseCheck) <= 360)
+                return;
+
+            timeOfLastSkillIncreaseCheck = now.ToClassicDaggerfallTime();
+
+            for (short i = 0; i < skillUses.Length; i++)
+            {
+                int skillAdvancementMultiplier = skills.GetAdvancementMultiplier((DaggerfallConnect.DFCareer.Skills)i);
+                float careerAdvancementMultiplier = Career.AdvancementMultiplier;
+                int usesNeededForAdvancement = FormulaHelper.CalculateSkillUsesForAdvancement(skills.GetSkillValue(i), skillAdvancementMultiplier, careerAdvancementMultiplier, level);
+                if (skillUses[i] >= usesNeededForAdvancement)
+                {
+                    skillUses[i] = 0;
+                    skills.SetSkillValue(i, (short)(skills.GetSkillValue(i) + 1));
+                    SetCurrentLevelUpSkillSum();
+                    DaggerfallUI.Instance.PopupMessage(HardStrings.skillImprove.Replace("%s", DaggerfallUnity.Instance.TextProvider.GetSkillName((DaggerfallConnect.DFCareer.Skills)i)));
+                }
+            }
+
+            if (CheckForLevelUp())
+                DaggerfallUI.PostMessage(DaggerfallUIMessages.dfuiOpenCharacterSheetWindow);
+        }
+
+        /// <summary>
+        /// Calculate current sum of skills used for determining player level.
+        /// </summary>
+        public void SetCurrentLevelUpSkillSum()
+        {
+            short sum = 0;
+            short lowestMajorSkillValue = 0;
+            short highestMinorSkillValue = 0;
+            List<DaggerfallConnect.DFCareer.Skills> primarySkills = GetPrimarySkills();
+            List<DaggerfallConnect.DFCareer.Skills> majorSkills = GetMajorSkills();
+            List<DaggerfallConnect.DFCareer.Skills> minorSkills = GetMinorSkills();
+            for (int i = 0; i < primarySkills.Count; i++)
+            {
+                sum += skills.GetSkillValue(primarySkills[i]);
+            }
+
+            for (int i = 0; i < majorSkills.Count; i++)
+            {
+                short value = skills.GetSkillValue(majorSkills[i]);
+                sum += value;
+                if (i == 0)
+                    lowestMajorSkillValue = value;
+                else if (value < lowestMajorSkillValue)
+                    lowestMajorSkillValue = value;
+            }
+
+            sum -= lowestMajorSkillValue;
+
+            for (int i = 0; i < minorSkills.Count; i++)
+            {
+                short value = skills.GetSkillValue(minorSkills[i]);
+                if (i == 0)
+                    highestMinorSkillValue = value;
+                else if (value > highestMinorSkillValue)
+                    highestMinorSkillValue = value;
+            }
+
+            sum += highestMinorSkillValue;
+            currentLevelUpSkillSum = sum;
+        }
+
+        /// <summary>
+        /// Estimate the starting sum of skills used for determining player level.
+        /// </summary>
+        public void EstimateStartingLevelUpSkillSum()
+        {
+            float estimatedLevel = level + 0.5f; // Assume the player is halfway through advancing a level
+            int estimatedSum = (int)((estimatedLevel * 15) - (28 + currentLevelUpSkillSum)) * -1;
+            if ((currentLevelUpSkillSum > 0) && (startingLevelUpSkillSum > currentLevelUpSkillSum))
+                startingLevelUpSkillSum = currentLevelUpSkillSum;
+            else
+                startingLevelUpSkillSum = estimatedSum;
+        }
+
+        /// <summary>
+        /// Calculate level and check for level up.
+        /// </summary>
+        public bool CheckForLevelUp()
+        {
+            int calculatedLevel = FormulaHelper.CalculatePlayerLevel(startingLevelUpSkillSum, currentLevelUpSkillSum);
+            bool levelUp = (level < calculatedLevel);
+            if (levelUp)
+                readyToLevelUp = true;
+
+            return levelUp;
+        }
+
         #endregion
 
         #region Event Handlers
@@ -201,16 +328,15 @@ namespace DaggerfallWorkshop.Game.Entity
 
         private void PlayerEntity_OnExhausted(DaggerfallEntity entity)
         {
-            GameManager.Instance.PlayerMotor.CancelMovement = true;
-
             const int youDropToTheGround1 = 1071;
             const int youDropToTheGround2 = 1072;
-            const float recoveryRate = 0.125f; // temporary value
 
             bool enemiesNearby = GameManager.Instance.AreEnemiesNearby();
 
             ITextProvider textProvider = DaggerfallUnity.Instance.TextProvider;
             TextFile.Token[] tokens;
+
+            GameManager.Instance.PlayerMotor.CancelMovement = true;
 
             if (!enemiesNearby)
                 tokens = textProvider.GetRSCTokens(youDropToTheGround1);

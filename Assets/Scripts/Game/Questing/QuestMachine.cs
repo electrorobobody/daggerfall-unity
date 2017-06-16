@@ -28,6 +28,10 @@ namespace DaggerfallWorkshop.Game.Questing
     /// Running quests can perform actions in the world (e.g. spawn enemies and play sounds).
     /// Or they can provide data to external systems like the NPC dialog interface (e.g. 'tell me about' and 'rumors').
     /// Quest support is considered to be in very early prototype stages and may change at any time.
+    /// 
+    /// Notes:
+    ///  * Quests are not serialized at this time.
+    ///  * Some data, such as reserved sites, need to be serialized from QuestMachine.
     /// </summary>
     public class QuestMachine : MonoBehaviour
     {
@@ -45,7 +49,8 @@ namespace DaggerfallWorkshop.Game.Questing
         const string staticMessagesTableFilename = "Quests-StaticMessages";
         const string placesTableFilename = "Quests-Places";
         const string soundsTableFilename = "Quests-Sounds";
-        const string itemsTableFileName = "Quests-items";
+        const string itemsTableFileName = "Quests-Items";
+        const string factionsTableFileName = "Quests-Factions";
 
         // Data tables
         Table globalVarsTable;
@@ -53,10 +58,12 @@ namespace DaggerfallWorkshop.Game.Questing
         Table placesTable;
         Table soundsTable;
         Table itemsTable;
+        Table factionsTable;
 
         List<IQuestAction> actionTemplates = new List<IQuestAction>();
         Dictionary<ulong, Quest> quests = new Dictionary<ulong, Quest>();
         List<Quest> questsToRemove = new List<Quest>();
+        List<ReservedSite> reservedSites = new List<ReservedSite>();
 
         bool waitingForStartup = true;
         float startupTimer = 0;
@@ -123,6 +130,27 @@ namespace DaggerfallWorkshop.Game.Questing
             get { return itemsTable; }
         }
 
+        /// <summary>
+        /// Gets the factions data table.
+        /// </summary>
+        public Table FactionsTable
+        {
+            get { return factionsTable; }
+        }
+
+        #endregion
+
+        #region Structs
+
+        /// <summary>
+        /// Data required by reserved sites.
+        /// </summary>
+        struct ReservedSite
+        {
+            public ulong uid;                      // UID of quest owning site
+            public SiteDetails siteDetails;        // Full details of site
+        }
+
         #endregion
 
         #region Unity
@@ -136,6 +164,7 @@ namespace DaggerfallWorkshop.Game.Questing
             placesTable = new Table(Instance.GetTableSourceText(placesTableFilename));
             soundsTable = new Table(Instance.GetTableSourceText(soundsTableFilename));
             itemsTable = new Table(Instance.GetTableSourceText(itemsTableFileName));
+            factionsTable = new Table(Instance.GetTableSourceText(factionsTableFileName));
         }
 
         void Start()
@@ -145,6 +174,12 @@ namespace DaggerfallWorkshop.Game.Questing
 
         private void Update()
         {
+            // Do not tick while HUD fading
+            // This is to prevent quest popups or other actions while player
+            // moving between interior/exterior
+            if (DaggerfallUI.Instance.FadeInProgress)
+                return;
+
             // Handle startup delay
             if (waitingForStartup)
             {
@@ -171,7 +206,9 @@ namespace DaggerfallWorkshop.Game.Questing
             // Remove completed quests after update completed
             foreach (Quest quest in questsToRemove)
             {
+                RemoveReservedSites(quest);
                 quests.Remove(quest.UID);
+                RaiseOnQuestEndedEvent(quest);
             }
 
             // Reset update timer
@@ -208,6 +245,9 @@ namespace DaggerfallWorkshop.Game.Questing
             RegisterAction(new StopClock(null));
             RegisterAction(new RemoveLogMessage(null));
             RegisterAction(new PlayVideo(null));
+            RegisterAction(new PcAt(null));
+            RegisterAction(new ReserveSite(null));
+            RegisterAction(new PlaceNpc(null));
         }
 
         void RegisterAction(IQuestAction actionTemplate)
@@ -353,7 +393,7 @@ namespace DaggerfallWorkshop.Game.Questing
         /// <summary>
         /// Get all Place site details for all active quests.
         /// </summary>
-        /// <returns></returns>
+        /// <returns>SiteDetails[] array.</returns>
         public SiteDetails[] GetAllActiveQuestSites()
         {
             List<SiteDetails> sites = new List<SiteDetails>();
@@ -369,6 +409,64 @@ namespace DaggerfallWorkshop.Game.Questing
             }
 
             return sites.ToArray();
+        }
+
+        /// <summary>
+        /// Reserves a site before placing quest resources.
+        /// </summary>
+        /// <param name="parentQuest">Quest owning this site.</param>
+        /// <param name="siteDetails">SiteDetails of site to reserve.</param>
+        public void ReserveSite(Quest parentQuest, SiteDetails siteDetails)
+        {
+            // Create reservation
+            ReservedSite reservedSite = new ReservedSite();
+            reservedSite.uid = parentQuest.UID;
+            reservedSite.siteDetails = siteDetails;
+
+            // Only a small number of sites will be active at a time
+            // Just using a list for now rather than a keyed dict
+            reservedSites.Add(reservedSite);
+        }
+
+        /// <summary>
+        /// Removes all sites reserved for a quest.
+        /// Typically used when ending a quest.
+        /// </summary>
+        /// <param name="parentQuest">Quest for which to remove all sites.</param>
+        public void RemoveReservedSites(Quest parentQuest)
+        {
+            // Copy reserved sites to new list ignoring the quest reservations being removed
+            List<ReservedSite> newReservedSites = new List<ReservedSite>();
+            for(int i = 0; i < reservedSites.Count; i++)
+            {
+                if (reservedSites[i].uid != parentQuest.UID)
+                    newReservedSites.Add(reservedSites[i]);
+            }
+
+            // Replace the old list
+            reservedSites.Clear();
+            reservedSites = newReservedSites;
+        }
+
+        /// <summary>
+        /// Checks if site has been reserved for any quest.
+        /// </summary>
+        /// <param name="siteDetails">Site to check for existing reservation.</param>
+        /// <returns>UID of quest that has reserved this site or 0 if no matching reserved sites found.</returns>
+        public ulong HasReservedSite(SiteDetails siteDetails)
+        {
+            foreach (ReservedSite site in reservedSites)
+            {
+                // If both mapId and buildingKey match this site is already reserved
+                // Not sure if we need to handle location-only sites at this point
+                if (site.siteDetails.mapId == siteDetails.mapId &&
+                    site.siteDetails.buildingKey == siteDetails.buildingKey)
+                {
+                    return site.uid;
+                }
+            }
+
+            return 0;
         }
 
         #endregion
@@ -441,6 +539,15 @@ namespace DaggerfallWorkshop.Game.Questing
         {
             if (OnQuestStarted != null)
                 OnQuestStarted(quest);
+        }
+
+        // OnQuestEnded
+        public delegate void OnQuestEndedEventHandler(Quest quest);
+        public static event OnQuestEndedEventHandler OnQuestEnded;
+        protected virtual void RaiseOnQuestEndedEvent(Quest quest)
+        {
+            if (OnQuestEnded != null)
+                OnQuestEnded(quest);
         }
 
         #endregion

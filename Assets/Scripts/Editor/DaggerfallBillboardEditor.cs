@@ -143,8 +143,22 @@ namespace DaggerfallWorkshop
                     });
                     GUILayoutHelper.Horizontal(() =>
                     {
+                        EditorGUILayout.LabelField("ImageId", GUILayout.Width(EditorGUIUtility.labelWidth - 4));
+                        EditorGUILayout.SelectableLabel(dfBillboard.Summary.NativeTextureId.ToString("X4"), EditorStyles.textField, GUILayout.Height(EditorGUIUtility.singleLineHeight));
+                    });
+
+                    GUILayoutHelper.Horizontal(() =>
+                    {
                         EditorGUILayout.LabelField("FactionId", GUILayout.Width(EditorGUIUtility.labelWidth - 4));
                         EditorGUILayout.SelectableLabel(dfBillboard.Summary.FactionOrMobileID.ToString("X4"), EditorStyles.textField, GUILayout.Height(EditorGUIUtility.singleLineHeight));
+
+                        string factionName = "<unknown>";
+                        var factionFile = DaggerfallUnity.Instance.ContentReader.FactionFileReader;
+                        FactionFile.FactionData factionData;
+                        if (factionFile.GetFactionData(dfBillboard.Summary.FactionOrMobileID, out factionData))
+                            factionName = factionData.name;
+
+                        EditorGUILayout.SelectableLabel(factionName, EditorStyles.textField, GUILayout.Height(EditorGUIUtility.singleLineHeight));
                     });
                     GUILayoutHelper.Horizontal(() =>
                     {

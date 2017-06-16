@@ -1,5 +1,5 @@
-// Project:         Daggerfall Tools For Unity
-// Copyright:       Copyright (C) 2009-2016 Daggerfall Workshop
+﻿// Project:         Daggerfall Tools For Unity
+// Copyright:       Copyright (C) 2009-2017 Daggerfall Workshop
 // Web Site:        http://www.dfworkshop.net
 // License:         MIT License (http://www.opensource.org/licenses/mit-license.php)
 // Source Code:     https://github.com/Interkarma/daggerfall-unity
@@ -10,27 +10,51 @@
 //
 
 using System.IO;
+using System.Linq;
 using System.Collections.Generic;
 using IniParser;
 using IniParser.Model;
 using UnityEngine;
 using DaggerfallWorkshop.Game.UserInterface;
 using DaggerfallWorkshop.Game.UserInterfaceWindows;
+using DaggerfallWorkshop.Utility;
 
 namespace DaggerfallWorkshop.Game.Utility.ModSupport.ModSettings
 {
+    /// <summary>
+    /// A graphical window to edit mod settings, wich are saved in a ini file.
+    /// Supports applying presets created by modders and users,
+    /// as well as restoring default values.
+    /// </summary>
     public class ModSettingsWindow : DaggerfallPopupWindow
     {
-        // Constructors
-        public ModSettingsWindow(IUserInterfaceManager uiManager)
+        /// <summary>
+        /// Constructor for the mod settings window.
+        /// </summary>
+        /// <param name="mod">Mod whose values are to be exposed on screen.</param>
+        public ModSettingsWindow(IUserInterfaceManager uiManager, Mod mod)
             : base(uiManager)
         {
+            Mod = mod;
         }
 
+        public override void Update()
+        {
+            base.Update();
+
+            if(Input.GetKeyDown(KeyCode.Tab) && modSettingsPages.Count > 1)
+                NextPage();
+        }
+
+        #region Fields
+
         // UI Controls
-        Panel modSettingsPanel        = new Panel();
+        Panel modSettingsPanel = new Panel();
+        List<Panel> modSettingsPages = new List<Panel>();
+        Panel currentPanel;
+        int currentPage = 0;
+        Button nextPageButton;
         DaggerfallListPickerWindow presetPicker;
-        const int elementsForColumn = 19;
         const int spacing = 8;
         const int startX = 10;
         const int startY = 6;
@@ -38,23 +62,25 @@ namespace DaggerfallWorkshop.Game.Utility.ModSupport.ModSettings
         int y = startY;
 
         // Fields
+        private Mod Mod;
         string path;
         IniData data;
         IniData defaultSettings;
-        FileIniDataParser parser      = new FileIniDataParser();
-        List<TextBox> modTextBoxes    = new List<TextBox>();
-        List<Checkbox> modCheckboxes  = new List<Checkbox>();
+        FileIniDataParser parser                = new FileIniDataParser();
+        List<TextBox> modTextBoxes              = new List<TextBox>();
+        List<Checkbox> modCheckboxes            = new List<Checkbox>();
+        List<Tuple<TextBox, TextBox>> modTuples = new List<Tuple<TextBox, TextBox>>();
         int currentPresetIndex;
-        List<IniData> presets         = new List<IniData>();
+        List<IniData> presets                   = new List<IniData>();
 
         // Colors
         Color panelBackgroundColor    = new Color(0, 0, 0, 0.7f);
         Color resetButtonColor        = new Color(1, 0, 0, 0.4f); //red with alpha
         Color saveButtonColor         = new Color(0.0f, 0.5f, 0.0f, 0.4f); //green with alpha
         Color cancelButtonColor       = new Color(0.2f, 0.2f, 0.2f, 0.4f); //grey with alpha
-
-        // Properties
-        public Mod Mod { get; set; }
+        Color sectionTitleColor       = new Color(0.16f, 0.26f, 1, 1); // light blue
+        
+        #endregion
 
         #region Setup
 
@@ -94,9 +120,7 @@ namespace DaggerfallWorkshop.Game.Utility.ModSupport.ModSettings
             titleLabel.Position = new Vector2(0, y);
             titleLabel.HorizontalAlignment = HorizontalAlignment.Center;
             modSettingsPanel.Components.Add(titleLabel);
-
-            // Settings
-            LoadSettings();
+            currentPanel = modSettingsPanel;
 
             // Reset button
             Button resetButton = GetButton("Reset", HorizontalAlignment.Left, resetButtonColor);
@@ -118,6 +142,10 @@ namespace DaggerfallWorkshop.Game.Utility.ModSupport.ModSettings
                 presetButton.Size = new Vector2(35, 9);
                 presetButton.OnMouseClick += PresetButton_OnMouseClick;
             }
+
+            // Settings
+            modSettingsPages.Add(GetPanel(true));
+            LoadSettings();
         }
 
         #endregion
@@ -125,39 +153,34 @@ namespace DaggerfallWorkshop.Game.Utility.ModSupport.ModSettings
         #region Methods
 
         /// <summary>
-        /// Load settings from ini file.
+        /// Load settings from IniData.
+        /// This will be read from the ini file on disk the first time.
         /// </summary>
         private void LoadSettings ()
         {
             // Read file
-            data = parser.ReadFile(path);
-            ModSettingsReader.UpdateSettings(ref data, defaultSettings, Mod);
+            if (data == null)
+            {
+                data = parser.ReadFile(path);
+                ModSettingsReader.UpdateSettings(ref data, defaultSettings, Mod);
+            }
 
             // Read settings
             int numberOfElements = 0;
-            foreach (SectionData section in data.Sections)
+            foreach (SectionData section in data.Sections.Where(x => x.SectionName != ModSettingsReader.internalSection))
             {
-                if (section.SectionName == ModSettingsReader.internalSection)
-                    continue;
-
                 // Section label
                 y += spacing;
                 TextLabel textLabel = new TextLabel();
                 textLabel.Text = section.SectionName;
-                textLabel.TextColor = Color.blue;
+                textLabel.TextColor = sectionTitleColor;
                 textLabel.Position = new Vector2(x, y);
                 textLabel.HorizontalAlignment = HorizontalAlignment.None;
-                modSettingsPanel.Components.Add(textLabel);
+                currentPanel.Components.Add(textLabel);
+
+                UpdateItemsCount(ref numberOfElements);
                 List<string> comments = section.Comments;
                 int comment = 0;
-
-                // Move to right column
-                numberOfElements++;
-                if (numberOfElements == elementsForColumn)
-                {
-                    y = startY;
-                    x += 160;
-                }
 
                 foreach (KeyData key in section.Keys)
                 {
@@ -174,35 +197,30 @@ namespace DaggerfallWorkshop.Game.Utility.ModSupport.ModSettings
                         settingName.ToolTipText = comments[comment];
                         comment++;
                     }
-                    modSettingsPanel.Components.Add(settingName);
+                    currentPanel.Components.Add(settingName);
 
                     // Setting field
                     if (key.Value == "True")
                         AddCheckBox(true);
                     else if (key.Value == "False")
                         AddCheckBox(false);
+                    else if (key.Value.Contains(ModSettingsReader.tupleDelimiterChar)) // Tuple
+                    {
+                        int index = key.Value.IndexOf(ModSettingsReader.tupleDelimiterChar);
+                        var first = GetTextbox(95, 19.6f, key.Value.Substring(0, index));
+                        var second = GetTextbox(116, 19.6f, key.Value.Substring(index + ModSettingsReader.tupleDelimiterChar.Length));
+                        modTuples.Add(new Tuple<TextBox, TextBox>(first, second));
+                    }
                     else
                     {
-                        TextBox textBox = new TextBox();
-                        textBox.Position = new Vector2(x + 95, y);
-                        textBox.AutoSize = AutoSizeModes.None;
-                        textBox.FixedSize = true;
-                        textBox.Size = new Vector2(40, 6);
-                        textBox.Numeric = false;
-                        textBox.MaxCharacters = 20;
-                        textBox.DefaultText = key.Value;
-                        textBox.UseFocus = true;
-                        textBox.Outline.Enabled = true;
-                        textBox.HasFocusOutlineColor = Color.green;
-                        textBox.LostFocusOutlineColor = Color.white;
-                        modSettingsPanel.Components.Add(textBox);
+                        TextBox textBox = GetTextbox(95, 40, key.Value);
                         modTextBoxes.Add(textBox);
 
                         // Color
                         if (textBox.DefaultText.Length == 8)
                         {
                             // Check if is a hex number or just a string with lenght eight
-                            int hexColor = 0;
+                            int hexColor;
                             if (int.TryParse(textBox.DefaultText, System.Globalization.NumberStyles.HexNumber,
                                      System.Globalization.CultureInfo.InvariantCulture, out hexColor))
                             {
@@ -210,41 +228,38 @@ namespace DaggerfallWorkshop.Game.Utility.ModSupport.ModSettings
                                 Color32 color = ModSettingsReader.ColorFromString(textBox.DefaultText);
                                 textBox.BackgroundColor = color;
                                 textBox.ToolTip = defaultToolTip;
-                                //textBox.ToolTipText = string.Format("{0}, {1}, {2}, {3}", color.r, color.g, color.b, color.a);
                                 textBox.ToolTipText = color.ToString();
                             }
                         }
                     }
 
-                    // Move to right column
-                    numberOfElements++;
-                    if (numberOfElements == elementsForColumn)
-                    {
-                        y = startY;
-                        x += 160;
-                    }    
+                    UpdateItemsCount(ref numberOfElements);
                 }
             }
         }
 
         /// <summary>
-        /// Write new settings to configuration file.
+        /// Save settings inside IniData.
         /// </summary>
-        private void SaveSettings ()
+        /// <param name="writeToDisk">Write settings to ini file on disk.</param>
+        private void SaveSettings (bool writeToDisk = true)
         {
             // Set new values
-            int checkBox = 0, textBox = 0;
-            foreach (SectionData section in data.Sections)
+            int checkBox = 0, textBox = 0, tuple = 0;
+            foreach (SectionData section in data.Sections.Where(x => x.SectionName != ModSettingsReader.internalSection))
             {
-                if (section.SectionName == ModSettingsReader.internalSection)
-                    continue;
-
                 foreach (KeyData key in section.Keys)
                 {
                     if (key.Value == "True" || key.Value == "False")
                     {
                         data[section.SectionName][key.KeyName] = modCheckboxes[checkBox].IsChecked.ToString();
                         checkBox++;
+                    }
+                    else if (key.Value.Contains(ModSettingsReader.tupleDelimiterChar))
+                    {
+                        string value = modTuples[tuple].First.ResultText + ModSettingsReader.tupleDelimiterChar + modTuples[tuple].Second.ResultText;
+                        data[section.SectionName][key.KeyName] = value;
+                        tuple++;
                     }
                     else
                     {
@@ -255,37 +270,152 @@ namespace DaggerfallWorkshop.Game.Utility.ModSupport.ModSettings
             }
 
             // Save to file
-            parser.WriteFile(path, data);
+            if (writeToDisk)
+                parser.WriteFile(path, data);
+        }
+
+        /// <summary>
+        /// Controls page and column disposition.
+        /// </summary>
+        /// <param name="numberOfElements">Number of titles and keys already placed on window.</param>
+        /// <returns>False on reached capacity limit.</returns>
+        private void UpdateItemsCount(ref int numberOfElements)
+        {
+            const int elementsPerColumn = 19;
+            const int elementsPerPage = elementsPerColumn * 2;
+
+            numberOfElements++;
+            if (numberOfElements % elementsPerPage == 0)
+            {
+                if (numberOfElements == elementsPerPage)
+                {
+                    // Create switch button
+                    nextPageButton = new Button()
+                    {
+                        Size = new Vector2(30, 6),
+                        HorizontalAlignment = HorizontalAlignment.Left,
+                        VerticalAlignment = VerticalAlignment.Top,
+                        BackgroundColor = cancelButtonColor
+                    };
+                    nextPageButton.Outline.Enabled = true;
+                    nextPageButton.Label.Text = "Page 1";
+                    nextPageButton.OnMouseClick += NextPageButton_OnMouseClick;
+                    modSettingsPanel.Components.Add(nextPageButton);    
+                }
+
+                // Add another page
+                modSettingsPages.Add(GetPanel(false));
+
+                // Move to left column
+                y = startY;
+                x = startX;
+            }
+            else if (numberOfElements % elementsPerColumn == 0)
+            {
+                // Move to right column
+                y = startY;
+                x += 160;
+            }
+        }
+
+        /// <summary>
+        /// Switch between pages.
+        /// </summary>
+        private void NextPage()
+        {
+            modSettingsPages[currentPage].Enabled = false;
+
+            currentPage++;
+            if (currentPage == modSettingsPages.Count)
+                currentPage = 0;
+
+            modSettingsPages[currentPage].Enabled = true;
+            nextPageButton.Label.Text = "Page " + (currentPage + 1).ToString();
         }
 
         /// <summary>
         /// Get a button.
         /// </summary>
+        /// <param name="label">Text on button.</param>
+        /// <param name="alignment">Left, center or right.</param>
+        /// <param name="backgroundColor">Color of button.</param>
+        /// <returns>Button on modSettingsPanel</returns>
         private Button GetButton (string label, HorizontalAlignment alignment, Color backgroundColor)
         {
-            Button button = new Button();
-            button.Size = new Vector2(30, 9);
-            button.HorizontalAlignment = alignment;
-            button.VerticalAlignment = VerticalAlignment.Bottom;
-            button.BackgroundColor = backgroundColor;
+            Button button = new Button()
+            {
+                Size = new Vector2(30, 9),
+                HorizontalAlignment = alignment,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                BackgroundColor = backgroundColor,
+            };
             button.Outline.Enabled = true;
             button.Label.Text = label;
-            modSettingsPanel.Components.Add(button);
+            currentPanel.Components.Add(button);
             return button;
         }
 
         /// <summary>
         /// Add a checkbox.
         /// </summary>
+        /// <param name="isChecked">Should start checked?</param>
         private void AddCheckBox (bool isChecked)
         {
-            Checkbox checkbox = new Checkbox();
-            checkbox.Position = new Vector2(x + 95, y);
-            checkbox.Size = new Vector2(2, 2);
-            checkbox.CheckBoxColor = Color.white;
-            checkbox.IsChecked = isChecked;
-            modSettingsPanel.Components.Add(checkbox);
+            Checkbox checkbox = new Checkbox()
+            {
+                Position = new Vector2(x + 95, y),
+                Size = new Vector2(2, 2),
+                CheckBoxColor = Color.white,
+                IsChecked = isChecked
+            };
+            currentPanel.Components.Add(checkbox);
             modCheckboxes.Add(checkbox);
+        }
+
+        /// <summary>
+        /// Get a TextBox.
+        /// </summary>
+        /// <param name="positionOffset">Offset for x position on window.</param>
+        /// <param name="sizeLenght">X value of size.</param>
+        /// <param name="text">Default value for this textbox.</param>
+        /// <returns>TextBox on modSettingsPanel</returns>
+        private TextBox GetTextbox(float positionOffset, float sizeLenght, string text)
+        {
+            TextBox textBox = new TextBox()
+            {
+                Position = new Vector2(x + positionOffset, y),
+                AutoSize = AutoSizeModes.None,
+                FixedSize = true,
+                Size = new Vector2(sizeLenght, 6),
+                Numeric = false,
+                MaxCharacters = 20,
+                DefaultText = text,
+                UseFocus = true,
+                HasFocusOutlineColor = Color.green,
+                LostFocusOutlineColor = Color.white,
+            };
+            textBox.Outline.Enabled = true;
+            currentPanel.Components.Add(textBox);
+            return textBox;
+        }
+
+        /// <summary>
+        /// Get a panel and set it as current page.
+        /// </summary>
+        /// <param name="isEnabled">Is panel enabled?</param>
+        private Panel GetPanel(bool isEnabled)
+        {
+            Panel panel = new Panel()
+            {
+                BackgroundColor = Color.clear,
+                Position = new Vector2(0, 0),
+                Size = new Vector2(320, 175),
+                Enabled = isEnabled
+            };
+            panel.Outline.Enabled = false;
+            modSettingsPanel.Components.Add(panel);
+            currentPanel = panel;
+            return panel;
         }
 
         /// <summary>
@@ -294,10 +424,13 @@ namespace DaggerfallWorkshop.Game.Utility.ModSupport.ModSettings
         private void RestartSettingsWindow()
         {
             modSettingsPanel.Components.Clear();
+            modSettingsPages.Clear();
 
             modTextBoxes.Clear();
             modCheckboxes.Clear();
+            modTuples.Clear();
 
+            currentPage = 0;
             x = startX;
             y = startY;
 
@@ -307,6 +440,14 @@ namespace DaggerfallWorkshop.Game.Utility.ModSupport.ModSettings
         #endregion
 
         #region Event Handlers
+
+        /// <summary>
+        /// Switch between pages.
+        /// </summary>
+        private void NextPageButton_OnMouseClick(BaseScreenComponent sender, Vector2 position)
+        {
+            NextPage();
+        }
 
         /// <summary>
         /// Save new settings and close the window.
@@ -346,8 +487,9 @@ namespace DaggerfallWorkshop.Game.Utility.ModSupport.ModSettings
         {
             if (messageBoxButton == DaggerfallMessageBox.MessageBoxButtons.Yes)
             {
-                // Get and save default settings
-                parser.WriteFile(path, defaultSettings);
+                // Save default settings
+                data = defaultSettings;
+                parser.WriteFile(path, data);
 
                 // Restart settings window
                 CloseWindow();
@@ -471,24 +613,14 @@ namespace DaggerfallWorkshop.Game.Utility.ModSupport.ModSettings
             if (messageBoxButton == DaggerfallMessageBox.MessageBoxButtons.Yes)
             {
                 // Save current settings
-                SaveSettings();
-                data = parser.ReadFile(path);
+                SaveSettings(false);
 
                 // Confront current settings and preset
-                IniData presetData = presets[currentPresetIndex];
-                foreach (SectionData section in presetData.Sections)
-                {
-                    if (section.SectionName == ModSettingsReader.internalSection)
-                        continue;
-
+                foreach (SectionData section in presets[currentPresetIndex].Sections.Where(x => x.SectionName != ModSettingsReader.internalSection))
                     foreach (KeyData key in section.Keys)
-                    {
-                        data[section.SectionName][key.KeyName] = presetData[section.SectionName][key.KeyName];
-                    }
-                }
+                        data[section.SectionName][key.KeyName] = key.Value;
 
-                // Save changes and restart window
-                parser.WriteFile(path, data);
+                // Apply changes
                 CloseWindow();
                 presetPicker.CloseWindow();
                 RestartSettingsWindow();

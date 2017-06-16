@@ -500,7 +500,7 @@ namespace DaggerfallConnect
             public Int32 ZPos;
 
             /// <summary>Index of texture compressed to a bitfield.</summary>
-            internal UInt16 TextureBitfield;
+            public UInt16 TextureBitfield;
 
             /// <summary>Texture archive from bitfield. Used to determine which texture file to load (e.g. TEXTURE.210).</summary>
             public int TextureArchive;

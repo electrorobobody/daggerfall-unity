@@ -141,6 +141,9 @@ namespace DaggerfallWorkshop.Game.Questing
             Match match = Regex.Match(line, matchStr);
             if (match.Success)
             {
+                // Seed random
+                UnityEngine.Random.InitState(Time.renderedFrameCount);
+
                 // Store symbol for quest system
                 Symbol = new Symbol(match.Groups["symbol"].Value);
 
@@ -194,7 +197,8 @@ namespace DaggerfallWorkshop.Game.Questing
                 }
                 else if (placeType == PlaceTypes.Remote)
                 {
-                    // TODO: Get a remote site in same region quest was issued
+                    // Get a remote site in same region quest was issued
+                    SetupRemoteSite();
                 }
                 else if (placeType == PlaceTypes.Fixed && p1 > 0xc300)
                 {
@@ -223,19 +227,19 @@ namespace DaggerfallWorkshop.Game.Questing
                 // TODO: Just stubbing out for testing right now as Place class not complete enough to return real values
 
                 case MacroTypes.NameMacro1:             // Name of house/business (e.g. Odd Blades)
-                    textOut = "BusinessName";
+                    textOut = siteDetails.buildingName;
                     break;
 
                 case MacroTypes.NameMacro2:             // Name of location (e.g. Gothway Garden)
-                    textOut = "LocationName";
+                    textOut = siteDetails.locationName;
                     break;
 
-                case MacroTypes.NameMacro3:             // Name of dungeon (e.g. Privateer's Hold)
-                    textOut = "DungeonName";
+                case MacroTypes.NameMacro3:             // Name of dungeon (e.g. Privateer's Hold) - Not sure about this one, need to test
+                    textOut = siteDetails.locationName;
                     break;
 
                 case MacroTypes.NameMacro4:             // Name of region (e.g. Tigonus)
-                    textOut = "RegionName";
+                    textOut = siteDetails.regionName;
                     break;
 
                 default:                                // Macro not supported
@@ -271,84 +275,65 @@ namespace DaggerfallWorkshop.Game.Questing
             // Get building type
             DFLocation.BuildingTypes buildingType = (DFLocation.BuildingTypes)p2;
 
-            // TODO: Get a random building type from available buildings
+            // TODO: Support random site
             if (p2 == -1)
                 throw new Exception("Random local site not implemented at this time.");
 
-            //// Get an array of potential sites with specified building type
-            //SiteDetails[] foundSites = CollectSitesOfBuildingType(location, buildingType);
-            //if (foundSites == null || foundSites.Length == 0)
-            //    throw new Exception(string.Format("Could not find local site of type {0} in location {1}.{2}.", buildingType, location.RegionName, location.Name));
+            // Get an array of potential quest sites with specified building type
+            SiteDetails[] foundSites = CollectQuestSitesOfBuildingType(location, buildingType);
+            if (foundSites == null || foundSites.Length == 0)
+                throw new Exception(string.Format("Could not find local site of type {0} in location {1}.{2}.", buildingType, location.RegionName, location.Name));
 
-            //// Select a random site from available list
-            //int selectedIndex = UnityEngine.Random.Range(0, foundSites.Length);
-            //siteDetails = foundSites[selectedIndex];
+            // Select a random site from available list
+            int selectedIndex = UnityEngine.Random.Range(0, foundSites.Length);
+            siteDetails = foundSites[selectedIndex];
         }
 
-        ///// <summary>
-        ///// Generate a list of potential sites based on building type.
-        ///// This uses actual map layout and block data rather than the (often inaccurate) list of building in map data.
-        ///// Likely to need refinement over time to exclude buildings without proper quest markers, etc.
-        ///// </summary>
-        //SiteDetails[] CollectSitesOfBuildingType(DFLocation location, DFLocation.BuildingTypes buildingType)
-        //{
-        //    List<SiteDetails> foundSites = new List<SiteDetails>();
+        #endregion
 
-        //    // Iterate through all blocks
-        //    DFBlock[] blocks;
-        //    RMBLayout.GetLocationBuildingData(location, out blocks);
-        //    int width = location.Exterior.ExteriorData.Width;
-        //    int height = location.Exterior.ExteriorData.Height;
-        //    for (int y = 0; y < height; y++)
-        //    {
-        //        for (int x = 0; x < width; x++)
-        //        {
-        //            // Iterate through all buildings in this block
-        //            int index = y * width + x;
-        //            BuildingSummary[] buildingSummary = RMBLayout.GetBuildingData(blocks[index]);
-        //            for (int i = 0; i < buildingSummary.Length; i++)
-        //            {
-        //                // Match building against required type
-        //                if (buildingSummary[i].BuildingType == buildingType)
-        //                {
-        //                    // Get building name based on type
-        //                    string buildingName;
-        //                    if (RMBLayout.IsResidence(buildingType))
-        //                    {
-        //                        // Generate a random surname for this residence
-        //                        DFRandom.srand((int)Time.realtimeSinceStartup);
-        //                        string surname = DaggerfallUnity.Instance.NameHelper.Surname(Utility.NameHelper.BankTypes.Breton);
-        //                        buildingName = HardStrings.theNamedResidence.Replace("%s", surname);
-        //                    }
-        //                    else
-        //                    {
-        //                        buildingName = BuildingNames.GetName(
-        //                            buildingSummary[i].NameSeed,
-        //                            buildingSummary[i].BuildingType,
-        //                            buildingSummary[i].FactionId,
-        //                            location.Name,
-        //                            location.RegionName);
-        //                    }
+        #region Remote Site Methods
 
-        //                    // Configure new site details
-        //                    siteDetails = new SiteDetails();
-        //                    siteDetails.mapId = location.MapTableData.MapId;
-        //                    siteDetails.locationId = location.Exterior.ExteriorData.LocationId;
-        //                    siteDetails.regionName = location.RegionName;
-        //                    siteDetails.locationName = location.Name;
-        //                    siteDetails.isBuilding = true;
-        //                    siteDetails.layoutX = x;
-        //                    siteDetails.layoutY = y;
-        //                    siteDetails.buildingName = buildingName;
-        //                    siteDetails.buildingSummary = buildingSummary[i];
-        //                    foundSites.Add(siteDetails);
-        //                }
-        //            }
-        //        }
-        //    }
+        /// <summary>
+        /// Get a remote site in the same region as player.
+        /// </summary>
+        void SetupRemoteSite()
+        {
+            // TODO: Support dungeons
+            if (p1 == 1)
+                throw new Exception("Remote dungeon site not implemented at this time.");
 
-        //    return foundSites.ToArray();
-        //}
+            // TODO: Support random site
+            if (p2 == -1)
+                throw new Exception("Random remote site not implemented at this time.");
+
+            // Get town candidate holding building type
+            GetRandomTownSite((DFLocation.BuildingTypes)p2);
+        }
+
+        #endregion
+
+        #region Fixed Site Methods
+
+        /// <summary>
+        /// Setup a fixed location.
+        /// </summary>
+        void SetupFixedLocation()
+        {
+            // Dungeon interiors have p2 > 0xfa00, exteriors have p2 = 0x01 || p2 = 0x02
+            // Need to p1 - 1 if inside dungeon for exterior location id
+            int locationId = -1;
+            if (p2 > 0xfa00)
+                locationId = p1 - 1;
+            else
+                locationId = p1;
+
+            // Get location
+            DFLocation location;
+            if (!DaggerfallUnity.Instance.ContentReader.GetQuestLocation(locationId, out location))
+                throw new Exception(string.Format("Could not find locationId: '{0};", locationId));
+
+            // TODO: Create a site for this location
+        }
 
         #endregion
 
@@ -372,25 +357,164 @@ namespace DaggerfallWorkshop.Game.Questing
             return result;
         }
 
-        ///// <summary>
-        ///// Setup a fixed location.
-        ///// </summary>
-        //void SetupFixedLocation()
-        //{
-        //    // Dungeon interiors have p2 > 0xfa00, exteriors have p2 = 0x01
-        //    // Need to subtract 1 if inside dungeon for exterior mapid
-        //    int locationId = -1;
-        //    if (p2 > 0xfa00)
-        //        locationId = p1 - 1;
-        //    else
-        //        locationId = p1;
+        /// <summary>
+        /// Generate a list of potential sites based on building type.
+        /// This uses actual map layout and block data rather than the (often inaccurate) list of building in map data.
+        /// Likely to need refinement over time to exclude buildings without proper quest markers, etc.
+        /// </summary>
+        SiteDetails[] CollectQuestSitesOfBuildingType(DFLocation location, DFLocation.BuildingTypes buildingType)
+        {
+            List<SiteDetails> foundSites = new List<SiteDetails>();
 
-        //    // Get location
-        //    if (!DaggerfallUnity.Instance.ContentReader.GetQuestLocation(locationId, out location))
-        //    {
-        //        Debug.LogFormat("Could not find locationId: '{0};", locationId);
-        //    }
-        //}
+            // Iterate through all blocks
+            DFBlock[] blocks;
+            RMBLayout.GetLocationBuildingData(location, out blocks);
+            int width = location.Exterior.ExteriorData.Width;
+            int height = location.Exterior.ExteriorData.Height;
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    // Iterate through all buildings in this block
+                    int index = y * width + x;
+                    BuildingSummary[] buildingSummary = RMBLayout.GetBuildingData(blocks[index], x, y);
+                    for (int i = 0; i < buildingSummary.Length; i++)
+                    {
+                        // Match building against required type
+                        if (buildingSummary[i].BuildingType == buildingType)
+                        {
+                            // Building must be a quest site
+                            // Checking for quest flat marker inside record interior
+                            if (!InteriorHasQuestMarker(blocks[index], i))
+                                continue;
+
+                            // Get building name based on type
+                            string buildingName;
+                            if (RMBLayout.IsResidence(buildingType))
+                            {
+                                // Generate a random surname for this residence
+                                DFRandom.srand(Time.renderedFrameCount);
+                                string surname = DaggerfallUnity.Instance.NameHelper.Surname(Utility.NameHelper.BankTypes.Breton);
+                                buildingName = HardStrings.theNamedResidence.Replace("%s", surname);
+                            }
+                            else
+                            {
+                                buildingName = BuildingNames.GetName(
+                                    buildingSummary[i].NameSeed,
+                                    buildingSummary[i].BuildingType,
+                                    buildingSummary[i].FactionId,
+                                    location.Name,
+                                    location.RegionName);
+                            }
+
+                            // Configure new site details
+                            siteDetails = new SiteDetails();
+                            siteDetails.mapId = location.MapTableData.MapId;
+                            siteDetails.locationId = location.Exterior.ExteriorData.LocationId;
+                            siteDetails.regionName = location.RegionName;
+                            siteDetails.locationName = location.Name;
+                            siteDetails.isBuilding = true;
+                            siteDetails.buildingKey = buildingSummary[i].buildingKey;
+                            siteDetails.buildingName = buildingName;
+                            foundSites.Add(siteDetails);
+                        }
+                    }
+                }
+            }
+
+            return foundSites.ToArray();
+        }
+
+        /// <summary>
+        /// Gets a town for remote site containing building type.
+        /// Daggerfall's locations are so generic that we usually find a match within a few random attempts
+        /// compared to indexing several hundred locations and only selecting from known-good candidates.
+        /// In short, there are so many possible candidates it's not worth narrowing them down. Throw darts instead.
+        /// Basic checks are still done to reject unsuitable locations very quickly.
+        /// </summary>
+        bool GetRandomTownSite(DFLocation.BuildingTypes requiredBuildingType)
+        {
+            // Get player region
+            int regionIndex = GameManager.Instance.PlayerGPS.CurrentRegionIndex;
+            DFRegion regionData = DaggerfallUnity.Instance.ContentReader.MapFileReader.GetRegion(regionIndex);
+
+            // Cannot use a region with no locations
+            // This should not happen in normal play
+            if (regionData.LocationCount == 0)
+                return false;
+
+            // Find random town containing building
+            int attempts = 0;
+            bool found = false;
+            while (!found)
+            {
+                // Increment attempts
+                attempts++;
+
+                // Get a random location index
+                int locationIndex = UnityEngine.Random.Range(0, (int)regionData.LocationCount);
+
+                // Discard all known dungeon types
+                if ((int)regionData.MapTable[locationIndex].DungeonType <= (int)DFRegion.DungeonTypes.Cemetery)
+                    continue;
+
+                // Get location data for town
+                DFLocation locationData = DaggerfallUnity.Instance.ContentReader.MapFileReader.GetLocation(regionIndex, locationIndex);
+                if (!locationData.Loaded)
+                    continue;
+
+                // Check if town contains building type in MAPS.BSA directory
+                if (!HasBuildingType(locationData, requiredBuildingType))
+                    continue;
+
+                // Get an array of potential quest sites with specified building type
+                // This ensures building site actually exists inside town, as MAPS.BSA directory can be incorrect
+                SiteDetails[] foundSites = CollectQuestSitesOfBuildingType(locationData, requiredBuildingType);
+                if (foundSites == null || foundSites.Length == 0)
+                    continue;
+
+                // Select a random site from available list
+                int selectedIndex = UnityEngine.Random.Range(0, foundSites.Length);
+                siteDetails = foundSites[selectedIndex];
+
+                // All conditions have been satisfied
+                found = true;
+            }
+
+            //Debug.LogFormat("Found remote candidate site in {0} attempts", attempts);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Quick check to see if map data lists a specific building type in header.
+        /// This can be inaccurate so should always followed up with a full check.
+        /// </summary>
+        bool HasBuildingType(DFLocation location, DFLocation.BuildingTypes buildingType)
+        {
+            foreach (var building in location.Exterior.Buildings)
+            {
+                if (building.BuildingType == buildingType)
+                    return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Check interior for quest marker (199.11) indicating this can be a quest site.
+        /// </summary>
+        bool InteriorHasQuestMarker(DFBlock blockData, int recordIndex)
+        {
+            DFBlock.RmbSubRecord recordData = blockData.RmbBlock.SubRecords[recordIndex];
+            foreach (DFBlock.RmbBlockFlatObjectRecord obj in recordData.Interior.BlockFlatObjectRecords)
+            {
+                if (obj.TextureArchive == 199 && obj.TextureRecord == 11)
+                    return true;
+            }
+
+            return false;
+        }
 
         #endregion
     }

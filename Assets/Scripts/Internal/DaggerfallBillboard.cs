@@ -22,6 +22,7 @@ using DaggerfallConnect;
 using DaggerfallConnect.Utility;
 using DaggerfallConnect.Arena2;
 using DaggerfallWorkshop.Utility.AssetInjection;
+using DaggerfallWorkshop.Game;
 
 namespace DaggerfallWorkshop
 {
@@ -74,6 +75,7 @@ namespace DaggerfallWorkshop
             public int Flags;                                   // NPC Flags found in RMB and RDB NPC data
             public int FactionOrMobileID;                       // FactionID for NPCs, Mobile ID for monsters
             public int NameSeed;                                // NPC name seed
+            public uint NativeTextureId;                        // NPC image id from original
             public MobileTypes FixedEnemyType;                  // Type for fixed enemy marker
             public TextureReplacement.CustomBillboard 
                 CustomBillboard;                                // Custom textures
@@ -84,7 +86,8 @@ namespace DaggerfallWorkshop
             if (Application.isPlaying)
             {
                 // Set self inactive if this is an editor marker
-                if (summary.FlatType == FlatTypes.Editor)
+                bool showEditorFlats = GameManager.Instance.StartGameBehaviour.ShowEditorFlats;
+                if (summary.FlatType == FlatTypes.Editor && !showEditorFlats)
                 {
                     this.gameObject.SetActive(false);
                     return;
@@ -185,6 +188,7 @@ namespace DaggerfallWorkshop
             summary.FactionOrMobileID = person.FactionID;
             summary.FixedEnemyType = MobileTypes.None;
             summary.Flags = person.Flags;
+            summary.NativeTextureId = person.TextureBitfield;
 
             // TEMP: Add name seed
             summary.NameSeed = (int)person.Position;
@@ -199,6 +203,7 @@ namespace DaggerfallWorkshop
             summary.Flags = resource.Flags;
             summary.FactionOrMobileID = (int)resource.FactionOrMobileId;
             summary.FixedEnemyType = MobileTypes.None;
+            summary.NativeTextureId = resource.TextureBitfield;
 
             // TEMP: Add name seed
             summary.NameSeed = (int)resource.Position;

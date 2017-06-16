@@ -32,6 +32,12 @@ namespace DaggerfallWorkshop.Game.Player
         public DaggerfallSkills startingSkills;
         public DaggerfallSkills workingSkills;
         public PlayerReflexes reflexes;
+        public int currentHealth;
+        public int maxHealth;
+        public int currentSpellPoints;
+        public int currentFatigue;
+        public short[] skillUses;
+        public int startingLevelUpSkillSum;
 
         public CharacterDocument()
         {
@@ -48,7 +54,9 @@ namespace DaggerfallWorkshop.Game.Player
             reflexes = PlayerReflexes.Average;
             workingSkills.SetDefaults();
             workingStats.SetFromCareer(career);
+            startingLevelUpSkillSum = 0;
             faceIndex = 0;
+            skillUses = new short[DaggerfallSkills.Count];
         }
 
         public static RaceTemplate GetRaceTemplate(Races race)

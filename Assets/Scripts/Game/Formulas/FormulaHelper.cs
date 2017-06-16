@@ -131,6 +131,19 @@ namespace DaggerfallWorkshop.Game.Formulas
             return lockpickingChance;
         }
 
+        // Calculate how many uses a skill needs before its value will rise.
+        public static int CalculateSkillUsesForAdvancement(int skillValue, int skillAdvancementMultiplier, float careerAdvancementMultiplier, int level)
+        {
+            double levelMod = Math.Pow(1.04, level);
+            return (int)Math.Floor((skillValue * skillAdvancementMultiplier * careerAdvancementMultiplier * levelMod * 2 / 5) + 1);
+        }
+
+        // Calculate player level.
+        public static int CalculatePlayerLevel(int startingLevelUpSkillsSum, int currentLevelUpSkillsSum)
+        {
+            return (int)Mathf.Floor((currentLevelUpSkillsSum - startingLevelUpSkillsSum + 28) / 15);
+        }
+
         #endregion
 
         #region Damage

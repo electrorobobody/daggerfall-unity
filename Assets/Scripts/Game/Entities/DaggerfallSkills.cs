@@ -367,5 +367,69 @@ namespace DaggerfallWorkshop.Game.Entity
         {
             return GetPrimaryStat((DFCareer.Skills)index);
         }
+
+        public int GetAdvancementMultiplier(DFCareer.Skills skill)
+        {
+            switch (skill)
+            {
+                case DFCareer.Skills.Medical:
+                    return 12;
+                case DFCareer.Skills.Etiquette:
+                case DFCareer.Skills.Streetwise:
+                    return 1;
+                case DFCareer.Skills.Jumping:
+                    return 5;
+                case DFCareer.Skills.Orcish:
+                case DFCareer.Skills.Harpy:
+                case DFCareer.Skills.Giantish:
+                case DFCareer.Skills.Dragonish:
+                case DFCareer.Skills.Nymph:
+                case DFCareer.Skills.Daedric:
+                case DFCareer.Skills.Spriggan:
+                case DFCareer.Skills.Centaurian:
+                case DFCareer.Skills.Impish:
+                    return 15;
+                case DFCareer.Skills.Lockpicking:
+                    return 2;
+                case DFCareer.Skills.Mercantile:
+                    return 1;
+                case DFCareer.Skills.Pickpocket:
+                case DFCareer.Skills.Stealth:
+                    return 2;
+                case DFCareer.Skills.Swimming:
+                    return 1;
+                case DFCareer.Skills.Climbing:
+                    return 2;
+                case DFCareer.Skills.Backstabbing:
+                    return 1;
+                case DFCareer.Skills.Dodging:
+                    return 4;
+                case DFCareer.Skills.Running:
+                    return 50;
+                case DFCareer.Skills.Destruction:
+                    return 1;
+                case DFCareer.Skills.Restoration:
+                    return 2;
+                case DFCareer.Skills.Illusion:
+                case DFCareer.Skills.Alteration:
+                    return 1;
+                case DFCareer.Skills.Thaumaturgy:
+                    return 2;
+                case DFCareer.Skills.Mysticism:
+                    return 1;
+                case DFCareer.Skills.ShortBlade:
+                case DFCareer.Skills.LongBlade:
+                case DFCareer.Skills.HandToHand:
+                case DFCareer.Skills.Axe:
+                case DFCareer.Skills.BluntWeapon:
+                    return 2;
+                case DFCareer.Skills.Archery:
+                    return 1;
+                case DFCareer.Skills.CriticalStrike:
+                    return 8;
+                default:
+                    return 0;
+            }
+        }
     }
 }

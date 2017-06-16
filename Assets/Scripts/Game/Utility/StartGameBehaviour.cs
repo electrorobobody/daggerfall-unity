@@ -24,6 +24,7 @@ using DaggerfallWorkshop.Game.Player;
 using DaggerfallWorkshop.Game.Entity;
 using DaggerfallWorkshop.Game.Serialization;
 using DaggerfallWorkshop.Game.UserInterfaceWindows;
+using DaggerfallWorkshop.Game.Questing;
 
 namespace DaggerfallWorkshop.Game.Utility
 {
@@ -36,11 +37,13 @@ namespace DaggerfallWorkshop.Game.Utility
 
         // Editor properties
         public StartMethods StartMethod = StartMethods.DoNothing;
-        public int OverrideSaveIndex = -1;
+        public int SaveIndex = -1;
         public string PostStartMessage = string.Empty;
+        public string LaunchQuest = string.Empty;
         public bool EnableVideos = true;
+        public bool ShowEditorFlats = false;
         public bool NoWorld = false;
-        public bool GodMod = false;
+        public bool GodMode = false;
 
         //events used to update state in state manager
         public static System.EventHandler OnStartMenu;
@@ -86,7 +89,7 @@ namespace DaggerfallWorkshop.Game.Utility
             TitleMenu,                              // Open title menu
             TitleMenuFromDeath,                     // Open title menu after death
             NewCharacter,                           // Spawn character to start location in INI
-            //LoadDaggerfallUnitySave,              // TODO: Make this work with new save/load system
+            LoadDaggerfallUnitySave,                // Make this work with new save/load system
             LoadClassicSave,                        // Loads a classic save using start save index
         }
 
@@ -138,12 +141,22 @@ namespace DaggerfallWorkshop.Game.Utility
                 case StartMethods.NewCharacter:
                     StartNewCharacter();
                     break;
+                case StartMethods.LoadDaggerfallUnitySave:
+                    LoadDaggerfallUnitySave();
+                    break;
                 case StartMethods.LoadClassicSave:
-                    if (OverrideSaveIndex != -1) classicSaveIndex = OverrideSaveIndex;
+                    if (SaveIndex != -1) classicSaveIndex = SaveIndex;
                     StartFromClassicSave();
                     break;
                 default:
                     break;
+            }
+
+            // Optionally start a quest
+            if (!string.IsNullOrEmpty(LaunchQuest))
+            {
+                QuestMachine.Instance.InstantiateQuest(LaunchQuest);
+                LaunchQuest = string.Empty;
             }
         }
 
@@ -229,7 +242,7 @@ namespace DaggerfallWorkshop.Game.Utility
                 weaponManager.RightHandWeapon.LeftHand = true;
 
             // GodMode setting
-            playerHealth.GodMode = GodMod;
+            playerHealth.GodMode = GodMode;
 
             // Enable/disable videos
             DaggerfallUI.Instance.enableVideos = EnableVideos;
@@ -374,6 +387,19 @@ namespace DaggerfallWorkshop.Game.Utility
 
         #endregion
 
+        #region Daggerfall Unity Save Startup
+
+        void LoadDaggerfallUnitySave()
+        {
+            if (SaveIndex == -1)
+                return;
+
+            SaveLoadManager.Instance.EnumerateSaves();
+            SaveLoadManager.Instance.Load(SaveIndex);
+        }
+
+        #endregion
+
         #region Classic Save Startup
 
         void StartFromClassicSave()
@@ -420,8 +446,14 @@ namespace DaggerfallWorkshop.Game.Utility
                 streamingWorld.suppressWorld = false;
             }
 
+            // Set whether the player's weapon is drawn
+            GameManager.Instance.WeaponManager.Sheathed = (!saveVars.WeaponDrawn);
+
             // Set game time
             DaggerfallUnity.Instance.WorldTime.Now.FromClassicDaggerfallTime(saveVars.GameTime);
+
+            // GodMode setting
+            playerHealth.GodMode = saveVars.GodMode;
 
             // Get character record
             List<SaveTreeBaseRecord> records = saveTree.FindRecords(RecordTypes.Character);
@@ -434,7 +466,10 @@ namespace DaggerfallWorkshop.Game.Utility
 
             // Assign data to player entity
             PlayerEntity playerEntity = FindPlayerEntity();
-            playerEntity.AssignCharacter(characterDocument, characterRecord.ParsedData.level, characterRecord.ParsedData.startingHealth);
+            playerEntity.AssignCharacter(characterDocument, characterRecord.ParsedData.level, characterRecord.ParsedData.maxHealth, false);
+
+            // Set time of last check for raising skills
+            playerEntity.TimeOfLastSkillIncreaseCheck = saveVars.LastSkillCheckTime;
 
             // Assign items to player entity
             playerEntity.AssignItems(saveTree);
@@ -453,6 +488,7 @@ namespace DaggerfallWorkshop.Game.Utility
             DaggerfallUI.PostMessage(PostStartMessage);
 
             lastStartMethod = StartMethods.LoadClassicSave;
+            SaveIndex = -1;
 
             if (OnStartGame != null)
                 OnStartGame(this, null);

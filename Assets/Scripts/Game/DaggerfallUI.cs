@@ -83,6 +83,7 @@ namespace DaggerfallWorkshop.Game
         DaggerfallAutomapWindow dfAutomapWindow;
         DaggerfallExteriorAutomapWindow dfExteriorAutomapWindow;
         DaggerfallBookReaderWindow dfBookReaderWindow;
+        DaggerfallQuestJournalWindow dfQuestJournalWindow;
         DaggerfallStaticNpcWindow dfStaticNpcWindow;
         QuestMachineInspectorWindow dfQuestInspector;
 
@@ -99,6 +100,11 @@ namespace DaggerfallWorkshop.Game
         public static DaggerfallFont DefaultFont { get { return Instance.GetFont(4); } }
         public static DaggerfallFont TitleFont { get { return Instance.GetFont(2); } }
         public static IUserInterfaceManager UIManager { get { return Instance.uiManager; } }
+
+        public bool FadeInProgress
+        {
+            get { return fadeInProgress; }
+        }
 
         public AudioSource AudioSource
         {
@@ -202,8 +208,8 @@ namespace DaggerfallWorkshop.Game
             dfTravelMapWindow = new DaggerfallTravelMapWindow(uiManager);
             dfAutomapWindow = new DaggerfallAutomapWindow(uiManager);
             dfBookReaderWindow = new DaggerfallBookReaderWindow(uiManager);
+            dfQuestJournalWindow = new DaggerfallQuestJournalWindow(uiManager);
             dfStaticNpcWindow = new DaggerfallStaticNpcWindow(uiManager);
-
             dfExteriorAutomapWindow = new DaggerfallExteriorAutomapWindow(uiManager);
 
             dfQuestInspector = new QuestMachineInspectorWindow(uiManager);
@@ -358,6 +364,10 @@ namespace DaggerfallWorkshop.Game
                 case DaggerfallUIMessages.dfuiStaticNpcWindow:
                     uiManager.PushWindow(dfStaticNpcWindow);
                     break;
+                case DaggerfallUIMessages.dfuiOpenQuestJournalWindow:
+                    uiManager.PushWindow(dfQuestJournalWindow);
+                    break;
+
                 case DaggerfallUIMessages.dfuiExitGame:
 #if UNITY_EDITOR
                     UnityEditor.EditorApplication.isPlaying = false;

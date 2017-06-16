@@ -107,6 +107,9 @@ namespace DaggerfallWorkshop.Game.Serialization
             data.playerEntity.currentHealth = entity.CurrentHealth;
             data.playerEntity.currentFatigue = entity.CurrentFatigue;
             data.playerEntity.currentMagicka = entity.CurrentMagicka;
+            data.playerEntity.skillUses = entity.SkillUses;
+            data.playerEntity.timeOfLastSkillIncreaseCheck = entity.TimeOfLastSkillIncreaseCheck;
+            data.playerEntity.startingLevelUpSkillSum = entity.StartingLevelUpSkillSum;
             data.playerEntity.equipTable = entity.ItemEquipTable.SerializeEquipTable();
             data.playerEntity.items = entity.Items.SerializeItems();
             data.playerEntity.wagonItems = entity.WagonItems.SerializeItems();
@@ -178,11 +181,21 @@ namespace DaggerfallWorkshop.Game.Serialization
             entity.CurrentHealth = data.playerEntity.currentHealth;
             entity.CurrentFatigue = data.playerEntity.currentFatigue;
             entity.CurrentMagicka = data.playerEntity.currentMagicka;
+            entity.SkillUses = data.playerEntity.skillUses;
+            entity.TimeOfLastSkillIncreaseCheck = data.playerEntity.timeOfLastSkillIncreaseCheck;
+            entity.StartingLevelUpSkillSum = data.playerEntity.startingLevelUpSkillSum;
             entity.Items.DeserializeItems(data.playerEntity.items);
             entity.WagonItems.DeserializeItems(data.playerEntity.wagonItems);
             entity.OtherItems.DeserializeItems(data.playerEntity.otherItems);
             entity.ItemEquipTable.DeserializeEquipTable(data.playerEntity.equipTable, entity.Items);
             entity.GoldPieces = data.playerEntity.goldPieces;
+            entity.SetCurrentLevelUpSkillSum();
+
+            // Fill in missing data for saves
+            if (entity.StartingLevelUpSkillSum <= 0)
+                entity.EstimateStartingLevelUpSkillSum();
+            if (entity.SkillUses == null)
+                entity.SkillUses = new short[DaggerfallSkills.Count];
 
             // Flag determines if player position is restored
             bool restorePlayerPosition = true;

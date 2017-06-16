@@ -64,6 +64,12 @@ namespace DaggerfallConnect.Save
             doc.workingStats = parsedData.currentStats;
             doc.workingSkills = parsedData.skills;
             doc.reflexes = parsedData.reflexes;
+            doc.currentHealth = parsedData.currentHealth;
+            doc.maxHealth = parsedData.maxHealth;
+            doc.currentSpellPoints = parsedData.currentSpellPoints;
+            doc.currentFatigue = parsedData.currentFatigue;
+            doc.skillUses = parsedData.skillUses;
+            doc.startingLevelUpSkillSum = parsedData.startingLevelUpSkillSum;
 
             return doc;
         }
@@ -89,12 +95,15 @@ namespace DaggerfallConnect.Save
             parsedData.armorValues = reader.ReadBytes(7);
 
             reader.BaseStream.Position = 0x58;
-            parsedData.startSumUnknown = reader.ReadInt32();
+            parsedData.startingLevelUpSkillSum = reader.ReadInt32();
             parsedData.opponentUnknown = reader.ReadInt32();
+
+            reader.BaseStream.Position = 0x5c;
+            parsedData.baseHealth = reader.ReadInt16();
 
             reader.BaseStream.Position = 0x7c;
             parsedData.currentHealth = reader.ReadInt16();
-            parsedData.startingHealth = reader.ReadInt16();
+            parsedData.maxHealth = reader.ReadInt16();
             parsedData.faceIndex = reader.ReadByte();
             parsedData.level = reader.ReadByte();
 
@@ -105,17 +114,26 @@ namespace DaggerfallConnect.Save
             parsedData.physicalGold = reader.ReadUInt32();
 
             reader.BaseStream.Position = 0x8d;
-            parsedData.maxMagicka = reader.ReadInt16();
+            parsedData.currentSpellPoints = reader.ReadInt16();
+            parsedData.maxSpellPoints = reader.ReadInt16();
 
-            // TODO: 0x91 reputation?
+            parsedData.reputationCommoners = reader.ReadInt16();
+            parsedData.reputationMerchants = reader.ReadInt16();
+            parsedData.reputationScholars = reader.ReadInt16();
+            parsedData.reputationNobility = reader.ReadInt16();
+            parsedData.reputationUnderworld = reader.ReadInt16();
 
-            reader.BaseStream.Position = 0x9d;
-            parsedData.skills = ReadSkills(reader);
+            parsedData.currentFatigue = reader.ReadUInt16();
 
-            reader.BaseStream.Position = 0x016f;
+            parsedData.skills = ReadSkills(reader, out parsedData.skillUses);
+
+            reader.BaseStream.Position = 0x16f;
             parsedData.equippedItems = ReadEquippedItems(reader);
 
-            reader.BaseStream.Position = 0x01fd;
+            reader.BaseStream.Position = 0x1f2;
+            parsedData.race2 = ReadRace(reader);
+
+            reader.BaseStream.Position = 0x1fd;
             parsedData.timeStamp = reader.ReadUInt32();
 
             reader.BaseStream.Position = 0x230;
@@ -156,6 +174,10 @@ namespace DaggerfallConnect.Save
 
         UInt16 ReadTransportationFlags(BinaryReader reader)
         {
+            // Known values:
+            // 1 = Foot
+            // 3 = Horse
+            // 5 = Cart
             return reader.ReadUInt16();
         }
 
@@ -170,15 +192,18 @@ namespace DaggerfallConnect.Save
             return (PlayerReflexes)value;
         }
 
-        DaggerfallSkills ReadSkills(BinaryReader reader)
+        DaggerfallSkills ReadSkills(BinaryReader reader, out Int16[] skillUses)
         {
             DaggerfallSkills skills = new DaggerfallSkills();
+            skillUses = new Int16[DaggerfallSkills.Count];
 
             for (int i = 0; i < DaggerfallSkills.Count; i++)
             {
-                Int16 shortValue = reader.ReadInt16();
-                reader.ReadInt32(); // Skip unknown Int32
-                skills.SetSkillValue(i, shortValue);
+                Int16 skillValue = reader.ReadInt16();
+                Int16 skillCounterValue = reader.ReadInt16();
+                reader.ReadInt16(); // Seems to always be 00
+                skills.SetSkillValue(i, skillValue);
+                skillUses[i] = skillCounterValue;
             }
 
             return skills;
@@ -221,17 +246,27 @@ namespace DaggerfallConnect.Save
             public UInt16 transportationFlags;
             public Races race;
             public Byte[] armorValues;
-            public Int32 startSumUnknown;
+            public Int32 startingLevelUpSkillSum; // The starting total of all the primary skills, the two top major skills and the top minor skill
             public Int32 opponentUnknown;
+            public Int16 baseHealth;
             public Int16 currentHealth;
-            public Int16 startingHealth;
+            public Int16 maxHealth;
             public Byte faceIndex;
             public Byte level;
             public PlayerReflexes reflexes;
             public UInt32 physicalGold;
-            public Int16 maxMagicka;
+            public Int16 currentSpellPoints;
+            public Int16 maxSpellPoints;
+            public Int16 reputationCommoners;
+            public Int16 reputationNobility;
+            public Int16 reputationScholars;
+            public Int16 reputationMerchants;
+            public Int16 reputationUnderworld;
+            public UInt16 currentFatigue;
             public DaggerfallSkills skills;
+            public Int16[] skillUses;
             public UInt32[] equippedItems;
+            public Races race2; // Stores character's original race for when returning from being a vampire, werewolf or wereboar
             public UInt32 timeStamp;
             public DFCareer career;
         }
